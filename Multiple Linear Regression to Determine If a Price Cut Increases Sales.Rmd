@@ -1,0 +1,157 @@
+---
+title: "Do price cuts increase sales?"
+output: html_notebook
+---
+
+## 1. Background
+
+
+Which factors influence grocery sales?
+
+Page 210.
+
+For 12 straight weeks, you have observed sales (in number of cases) of canned tomatoes at Mr. D's Supermarket.
+1. Was a promotional notice for canned tomatoes placed in all shopping carts?
+2. Was a coupon for canned tomotoes given to each customer?
+3. Was a price reduction (none, 1, or 2 cents off) given?
+
+Use this data to determine how these factors influence sales.
+
+Predict sales of canned tomatoes during a week in which you use a shopping cart notice, a coupon, and reduce price by 1 cent.
+
+
+```{r Load packages}
+library(tidyverse)
+library(openxlsx)
+```
+
+
+```{r Load Data}
+
+grocery <- read.xlsx("/Users/anitaowens/Documents/Marketing Analytics-Data Driven Techniques with Excel/Excel Files/Chapter 10 Excel Files/Grocery.xlsx")
+```
+
+
+```{r Inspect Data}
+str(grocery)
+```
+
+
+
+```{r Data Transformation}
+#Convert all character variables into factor in one line:
+grocery <- grocery %>% mutate_if(is.character, as.factor)
+
+#factor Price Reduction variable
+grocery$Price.Reduction <- as.factor(grocery$Price.Reduction)
+```
+
+
+
+```{r Grocery model}
+# All variables with the exception of Week as an independent variable
+grocery_model_lm <- lm(Sales ~ Coupon + Cart.Notice + Price.Reduction, data = grocery)
+
+summary(grocery_model_lm)
+```
+
+
+We have 2 significant and 2 insignificant variables. 
+
+Forecast equation:
+
+Predicted Sales = 14.500 - 1.16*CouponYes + 20.16*Cart.NoticeYes + 5*Price.Reduction1 + 12.75*Price.Reduction2.
+
+
+
+
+```{r Create New Price.Reduction variable}
+#Create new price reduction variable
+grocery <- grocery %>% 
+    mutate(Price.Reduction_new =
+      case_when(
+        Price.Reduction == 2 ~ 2,
+        Price.Reduction == 1 ~ 0,
+        Price.Reduction == 0 ~ 0))
+
+
+#We need to factor Price.Reduction_new
+grocery$Price.Reduction_new <- as.factor(grocery$Price.Reduction_new)
+
+#Check levels
+levels(grocery$Price.Reduction_new)
+
+#Inspect results
+str(grocery)
+```
+
+```{r Re-run model}
+
+#Model sales as explained by Cart.Notice and Price.Reduction_new
+grocery_model_lm_signifvars <- lm(Sales ~ Cart.Notice + Price.Reduction_new, data = grocery)
+
+#Print model output
+summary(grocery_model_lm_signifvars)
+
+```
+Forecast equation for significant variables only:
+
+Predicted Sales = 16.417 + 20.167*Cart.NoticeYes + 10.250*Price.Reduction_new2
+
+
+## Making predictions
+
+Predict sales of canned tomatoes during a week in which you use a shopping cart notice, a coupon, and reduce price by 1 cent.
+
+
+§ Out-of-sample data
+	□ we use the estimated model on a new dataset
+	® predict function
+		◊ we can apply this model to a new dataset
+
+
+
+```{r Create new data frame for predictions}
+# Create new data frame and print output
+(new_data <- data.frame(Cart.Notice = "Yes", Coupon = "Yes", Price.Reduction = "1"))
+
+```
+
+
+
+
+```{r Create predictions using original model - all variables}
+library(broom)
+
+# make predictions - response returns the fitted values
+augment(grocery_model_lm, newdata = new_data)
+```
+
+Using all variables our predicted sales are 38.5.
+
+
+```{r Create new dataframe for predictions for 2nd model}
+
+# Create new data frame
+(new_data_02 <- data.frame(Cart.Notice = "Yes", Price.Reduction_new="0"))
+
+```
+
+
+
+```{r Create predictions using 2nd model}
+#Using broom package
+augment(grocery_model_lm_signifvars, newdata = new_data_02)
+
+#Manual equation for making the predictions
+16.417 + (20.167*1) + (0)
+```
+
+Using significant variables gives us 36.58 predicted sales.
+
+## Extras
+
+```{r Use contrasts function to view factor type variable details}
+
+contrasts(grocery$Price.Reduction)
+```
