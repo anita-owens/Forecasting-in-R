@@ -155,3 +155,4 @@ Using significant variables gives us 36.58 predicted sales.
 
 contrasts(grocery$Price.Reduction)
 ```
+
