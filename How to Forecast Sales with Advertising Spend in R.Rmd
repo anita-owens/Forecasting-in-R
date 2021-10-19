@@ -1,0 +1,237 @@
+---
+title: "How to forecast sales with advertising spend in R"
+output: html_notebook
+---
+
+
+```{r Load packages}
+# Install pacman if needed
+if (!require("pacman")) install.packages("pacman")
+
+# load packages
+pacman::p_load(pacman,
+  tidyverse, openxlsx, forecast, psych)
+```
+
+
+```{r Import diet product ad data}
+#Import dataset
+diet <- read.xlsx("~/Documents/GitHub/Forecasting-in-R/Forecasting-in-R/datasets/Addata.xlsx", skipEmptyRows = TRUE)
+
+```
+
+
+## Date exploration
+
+```{r Check results of diet data import}
+#Check results
+str(diet)
+```
+
+
+Let's get a sense of the data so we will do some visualizations of our sales data. 
+
+
+
+```{r Describe data}
+#Use describe function from psych package. It gives a good overview of the dataset variables.
+describe(diet)
+```
+Average monthly sales is 24k with a standard deviation of 6 while  advertising spend average around 29k with a very large deviation of 19k.
+
+```{r Plot sales by advertising expenditure}
+#Plot Sales by Advertising
+ggplot(diet, aes(x=Advertising, y=Sales)) + geom_point() + geom_smooth(method = 'lm')
+
+#Plot sales over 36 months
+ggplot(diet, aes(x=Month, y = Sales)) + geom_line()
+```
+
+First, a scatterplot of sales and advertising. Sales are generally high when advertising spend is high which is perhaps not a big surprise, but this is not necessarily always the case. There seems to be wide variability between sales and advertising and the points all over the place.
+
+
+If we look at our sales data over time, we can see a lot of peaks and dips. There are definitely some dips around months 12, 24 and now 36 which suggests that sales are down around the Christmas holidays, but picks back up rather quickly.
+
+
+
+## Dynamic Regression Modeling
+
+
+```{r  Convert diet dataframe to time series object}
+#Convert dataframe to time series object using the ts() function
+diet_ts <- ts(data = diet[,c(2,3)])
+
+
+#Check results of transformation
+diet_ts
+```
+
+
+
+```{r Time plot}
+# Time plot of both variables
+autoplot(diet_ts, facets = TRUE)
+```
+
+
+
+
+We fit our model with auto.arima function from the forecast package.
+
+
+```{r Arima Model}
+# Fit ARIMA model
+fit <- auto.arima(diet_ts[, "Sales"], xreg = diet_ts[, "Advertising"], stationary = TRUE)
+
+# Check model fit
+fit
+```
+
+The auto.arima function has fit a linear regression model to the advertising variable and an an ARIMA model to the time series (month) variable. ARIMA (1,0,0)
+
+
+
+```{r Advertising coefficient}
+#What is the increase in sales for each unit increase in advertising?
+sales_increase <- coefficients(fit)[3]
+```
+
+Interpretation of sales increase: For every $1,000 (the unit of ad spend is in thousands USD) increase in advertising spend, the unit sales increase by 0.09.
+
+
+```{r Check Residuals}
+#Check Residuals
+checkresiduals(fit)
+```
+
+P-value is larger than 0.05 so the residuals are white noise. The residuals look nearly normally distributed.
+ 
+## Forecasting for the next quarter
+
+```{r Forecast sales for the next 3 months}
+#We need to provide forecast with the future value of our predictor which is Advertising. So here, we will spend 5 in month 1, 12 in month 2 and 40 in month 3.
+
+#Create a vector to hold advertising spend
+adv_spend <- c(5, 12, 40)
+
+#Let's build the forecast
+diet_fc <- forecast(fit, xreg = adv_spend)
+
+# Plot forecast
+autoplot(diet_fc) + xlab("Month") + ylab("Sales")
+```
+
+
+
+```{r Print forecast with confidence intervals}
+#Print forecast with confidence intervals
+diet_fc
+```
+
+
+```{r Extract and print forecasts in a pretty table}
+
+# Install ggpubr
+if (!require("ggpubr")) install.packages("ggpubr")
+library(ggpubr)
+
+#Create vectors needed
+sales_forecast <- round(diet_fc$mean, 2)
+month <- paste("Month", c(37:39), sep = " ")
+
+#Put forecasts into a dataframe
+forecasts <- cbind(month, sales_forecast)
+
+
+#Create nice looking table
+ forecast_table <- forecasts %>% 
+  ggtexttable(theme = ttheme("classic"))
+ 
+#Visualize table
+  forecast_table
+```
+
+
+## Forecasts using a Train/Test split
+
+
+```{r Train test data split}
+#We will use the first 33 months to train
+training <- window(diet_ts, end = 33)
+test <- window(diet_ts, start = 34)
+
+
+# Fit ARIMA model
+fit_02 <- auto.arima(training[, "Sales"], xreg = training[, "Advertising"], stationary = TRUE)
+
+# Check model fit
+fit_02
+```
+
+
+
+```{r Check Residuals on fit_02}
+#Check residuals on our training set
+checkresiduals(fit_02)
+```
+
+```{r Forecast sales on the test data and plot}
+#Forecast sales on the test set
+diet_fc_02 <- forecast(fit_02, xreg = test[,2])
+
+# Plot test set forecast
+autoplot(diet_fc_02) + xlab("Month") + ylab("Sales")
+```
+At first glance, our forecasts look pretty good although the confidence intervals are a bit wide.
+
+```{r Print forecast from forecast object}
+#Print forecast
+diet_fc_02
+```
+
+## How do you know if your forecasts are any good?
+
+Definitions:
+
+Errors = actual minus predicted values
+Standard Error = standard deviation of errors
+SSE =  Sum of Standard Error
+
+
+```{r Evaluate forecast accuracy}
+#Evaluate accuracy
+accuracy(diet_fc_02, test[,1])
+```
+
+
+
+```{r How far away were our forecasts from real sales}
+#Combine test data and the forecasts into a tibble dataframe
+explanatory_data <- as_tibble(cbind(test, diet_fc_02))
+
+#Make sure to use the back ticks when referencing the forecasts from the forecast model object
+explanatory_data <- explanatory_data %>% 
+  mutate(errors = test.Sales - `diet_fc_02.Point Forecast`,
+         squared_error = (test.Sales - `diet_fc_02.Point Forecast`)^2)
+
+#View results - Select only the relevant columns
+explanatory_data %>% 
+  select(test.Sales, `diet_fc_02.Point Forecast`, errors, squared_error)
+
+#Calculate standard error across all forecasts
+(standard_error <- sd(explanatory_data$errors, na.rm = TRUE))
+
+#Calculate sse across all forecasts
+(sse <- sum(explanatory_data$squared_error, na.rm = TRUE))
+```
+All of our forecasts were above actual sales (hence the negative errors).
+
+Our forecast error was the lowest for month 34, slightly higher for month 35 and the absolute worst forecast was for month 36. There does appear to be an interaction between advertising and sales.
+
+
+```{r Computing the mean absolute percentage error (MAPE) manually }
+#Computing the mean absolute percentage error (MAPE)
+mean(abs((explanatory_data$test.Sales-explanatory_data$`diet_fc_02.Point Forecast`)/explanatory_data$test.Sales)) * 100
+```
+Forecasts are off by on the test set 26% which is rather high and was much lower on the training set. This gives us the same result as the accuracy function from above, but there may be times you may need to manually calculate MAPE.
+
