@@ -137,7 +137,6 @@ model_spec_lm <- linear_reg() %>%
 
 ```{r Linear Regression Model Fit}
 # Fit Linear Regression Model
-
 model_fit_lm <- model_spec_lm %>%
     fit(actualsales ~ Month + Price + display, data = postit)
 
@@ -180,37 +179,31 @@ We built this linear model for mostly gaining insights into what factors influen
 
 We will split our dataset into test and training data. We will use the last 12 months of the dataset as the training set.
 
-```{r Time series split}
-#Split data into test and training set
+```{r Step 1: Time series split}
+
+#Step 1: Split data into test and training set
 splits <- postit %>%
   time_series_split(date_var = new_date, assess = "12 months", cumulative = TRUE)
-```
 
-
-```{r Visualize test train split}
 #Visualize test train split
 splits %>%
   tk_time_series_cv_plan() %>%
   plot_time_series_cv_plan(new_date, actualsales, .interactive = TRUE)
 ```
-We want to define our model engine. We will be using prophet.
-
-```{r Step 1: Model Specification - Time Series Model}
-# Step 1: Model Spec
-model_spec_prophet <- prophet_reg() %>%
-    set_engine('prophet')
-```
 
 
 
 
-```{r Step 2: Model Fit}
-# Step 2: Model fit
-model_fit_prophet <- model_spec_prophet %>%
-    fit(actualsales ~ ., data = training(splits))
+```{r Step 2: Model Specification and Model Fit}
+# Step 2: Model Spec and Model Fit
+model_fit_prophet  <- prophet_reg() %>%
+    set_engine('prophet') %>% 
+  fit(actualsales ~ ., data = training(splits))
 
 model_fit_prophet
 ```
+
+
 
 ```{r Step 3: Put model output into a modeltime table}
 #Step 3: Put model into a modeltime table
@@ -243,13 +236,15 @@ calibration_tbl %>%
     modeltime_residuals() %>%
     plot_modeltime_residuals(.interactive = TRUE, .type = "timeplot", .legend_show = FALSE)
 
+#Statistical tests
+calibration_tbl %>%
+    modeltime_residuals_test(new_data = testing(splits))
 ```
 
 modeltime_accuracy() function gives all accuracy metrics. 
 
-R-squared is very good at 0.95.
-
 I like to pay attention to the the mean absolute percentage error (MAPE) which is 6 so our forecasts are off around 6%. 
+
 We want our time series residuals to hover around zero. Everything seems okay until November and December as we start to see more variability.
 
 
@@ -321,16 +316,26 @@ CAUTION: It is super important that the data in your new data frame matches the 
 
 
 
-```{r Create future forecast on new dates}
+```{r Create future forecasts on new dates}
+#First, refit to the full dataset
+refit_tbl <- calibration_tbl %>%
+  modeltime_refit(data = postit)
+
 #Specify the H or horizon argument to get a forecast into the future, after refitting model to the entire dataset, but if using xregs (independent regressors), you must create a new dataframe with the xregs to be used.
 
-#forecast on the new tibble
-forecast_tbl_future_data <- calibration_tbl %>%
+#Forecast on the new tibble dataframe
+forecast_tbl_future_data <- refit_tbl %>%
     modeltime_forecast(
         new_data    = explanatory_data
     )
 
-#plot forecast
+#Check results of forecast
+head(forecast_tbl_future_data)
+```
+
+
+```{r Plot the forecasts}
+#Plot and visualize the forecasts
 plot_modeltime_forecast(forecast_tbl_future_data, .interactive = TRUE)
 ```
 
