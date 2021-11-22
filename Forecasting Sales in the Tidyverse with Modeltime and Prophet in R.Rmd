@@ -1,5 +1,6 @@
 ---
 title: "How to forecast product sales in the R Tidyverse with Modeltime and Prophet"
+author: "Anita Owens"
 output:
   html_document:
     df_print: paged
@@ -444,11 +445,11 @@ combined_df <- combined_df %>%
 #Check results
 head(combined_df)
 
-#Bar plot
+#Bar plot using geom_col
 ggplot(combined_df, aes(x=sales, y = month_year, fill = factor(year_of_sales))) +
   geom_col(position = "dodge")
 
-# Does the same
+# Does the same as above using geom_bar
 ggplot(combined_df, aes(x=sales, y = factor(month_year), fill = factor(year_of_sales))) +
   geom_bar(stat="identity", position=position_dodge()) + theme_minimal()
 
