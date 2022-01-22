@@ -1,0 +1,185 @@
+---
+title: "Forecasting with ANOVA in R"
+output:
+  html_document:
+    df_print: paged
+---
+
+## How use one-way ANOVA for forecasting in R
+
+
+## Set up environment
+
+
+```{r Load packages}
+# Install pacman if needed
+if (!require("pacman")) install.packages("pacman")
+
+# load packages
+pacman::p_load(pacman,
+  tidyverse, openxlsx, ggthemes)
+```
+
+
+##Scenario 1: If groups are insignificant
+
+Weekly sales (in hundreds)
+
+```{r Import bookstore dataset}
+bookstore <- read.xlsx("C:/Users/waow1/OneDrive - Hilding Anders/Documents/R files/OnewayANOVA.xlsx", skipEmptyRows = TRUE, sheet = "insignificant")
+
+
+head(bookstore)
+```
+
+```{r Sales means by location}
+colMeans(bookstore, na.rm = TRUE)
+```
+
+
+
+```{r From wide to long}
+books <- bookstore %>% 
+mutate(week_num = row_number())  %>%
+  pivot_longer(!week_num, names_to = "location",
+               values_to = "sales")
+
+books
+```
+
+
+```{r visualize book sales}
+#set Wall Street Journal theme for all plots
+theme_set(theme_wsj())
+
+ggplot(data = books, aes(x=location, y=sales)) + geom_boxplot(na.rm=TRUE) + ggtitle("Book sales by shelf location")
+```
+
+
+
+    
+```{r Test Assumptions}
+# Test normality across groups (Shapiro)
+tapply(books$sales, books$location, FUN = shapiro.test)
+
+# Check the homogeneity of variance (Bartlett)
+bartlett.test(sales ~ location, data = books)
+
+```
+
+Shapiro-Wilk normality test - all the p-values are very large so we can assume normality.
+
+Bartlett variance test - p-value is very large, we can assume homogeneity of variance
+
+
+
+```{r Oneway Test}
+# Perform one-way ANOVA 
+(anova_results <- oneway.test(sales ~ location, data = books, var.equal = TRUE))
+
+#Extract p-value
+
+#If true, means are different. If false, mean sales are identical in all shelf positions.
+if(anova_results$p.value < 0.05){
+  print("Means are different")
+} else{
+  print("Means are not different")
+}
+
+
+```
+
+Null hypothesis: Group means are equal
+Alternative hypothesis: Group means are not equal
+
+one-way analysis of means - p-value is very large at 0.5089
+
+
+
+INTERPRETATION OF ONE-WAY ANOVA RESULT:
+    The p-value of the test is greater than the significance level alpha = 0.05. We can cannot conclude that sales are significantly different based on shelf height. (The p-value is higher than 5%, so we fail to reject the null hypothesis that the means across groups are equal). In other words, we accept the null hypothesis and conclude that sales are not significantly different across shelf positions.
+    
+
+## Forecasting for scenario 1
+
+The predicted mean for each group is the overall mean. The forecast will be weekly sales of irrespective of shelf location.
+
+
+```{r Forecast:  mean of sales with na's removed}
+mean(books$sales, na.rm = TRUE)
+```
+
+We can expect sales of 1,120 books to be sold per week.
+
+How to estimate accuracy of the forecast?
+
+
+
+##Scenario 2: If one of the groups is significant
+
+```{r import bookstore sales for scenario 2}
+bookstore2 <- read.xlsx("C:/Users/waow1/OneDrive - Hilding Anders/Documents/R files/OnewayANOVA.xlsx", skipEmptyRows = TRUE, sheet = "significant")
+
+head(bookstore2)
+```
+
+```{r from wide to long scenario 2}
+(books2 <- bookstore2 %>% 
+mutate(week_num = row_number())  %>%
+  pivot_longer(!week_num, names_to = "location",
+               values_to = "sales"))
+```
+
+
+```{r Plot scenario 2}
+ggplot(data = books2, aes(x=location, y=sales)) + geom_boxplot(na.rm=TRUE)+ ggtitle("Book sales by shelf location", subtitle = "scenario 2")
+```
+
+```{r Test assumptions - test 2}
+# Test normality across groups
+tapply(books2$sales, books2$location, FUN = shapiro.test)
+
+# Check the homogeneity of variance
+bartlett.test(sales ~ location, data = books2)
+```
+
+```{r One-way Test 2}
+# Perform one-way ANOVA 
+(anova_results2 <- oneway.test(sales ~ location, data = books2, var.equal = TRUE))
+
+anova_results2$p.value < 0.05 #If true, means are different. reject null hypothesis and alternative hypothesis is true. if false, mean sales are identical in all shelf positions.
+```
+
+
+
+INTERPRETATION OF ONE-WAY ANOVA RESULT:
+The p-value is very small 0.003426 so we reject the null hypothesis and conclude that sales are significantly different.
+
+
+
+## Forecasting for scenario 2
+
+The predicted mean for each group equals the group mean
+
+```{r Forecast mean of sales scenario 2 with not applicables removed}
+(booksales_forecast_signif <- books2 %>% 
+   group_by(location) %>% 
+  summarize(mean_sales = mean(sales, na.rm = TRUE)))
+```
+
+We can expect sales of 900 books to be sold per week when located at the front, 1100 per week when located at the middle and 1400 per week when located at the back of the book section.
+
+## Playground
+```{r Oneway ANOVA Significance Function}
+oneway_sigif_function <- function(dataframe, y, x){
+  result <- oneway.test(y ~ x, data = dataframe, var.equal = TRUE)
+  if(result$p.value < 0.05){
+      print("Means are different")
+} else{
+  print("Means are not different")
+  }
+}
+
+oneway_sigif_function(books, books$sales, books$location)
+```
+

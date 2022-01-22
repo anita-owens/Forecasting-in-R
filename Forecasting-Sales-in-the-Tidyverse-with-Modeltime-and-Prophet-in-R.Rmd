@@ -1,0 +1,465 @@
+---
+title: "How to forecast product sales in the R Tidyverse with Modeltime and Prophet"
+author: "Anita Owens"
+---
+
+We have 3 years of daily sales of Post-its. Those lovable note snippets that hang around your desk.
+
+We will do the following:
+
+1.  Determine which factors influence sales.
+
+2.  Build a model to forecast daily sales.
+
+```{r Load packages}
+# Install pacman if needed
+if (!require("pacman")) install.packages("pacman")
+
+# load packages
+pacman::p_load(pacman,
+  tidyverse, openxlsx, modeltime, parsnip, rsample, timetk, broom, ggthemes)
+
+```
+
+```{r Import daily sales data}
+#Import data
+postit <- read.xlsx("~/Documents/GitHub/Forecasting-in-R/Forecasting-in-R/datasets/POSTITDATA.xlsx", skipEmptyRows = TRUE)
+
+#Check results
+str(postit)
+```
+
+We have 6 variables:
+
+1.  Month
+2.  Day number (Essentially a row number)
+3.  Day (This is our date variable but since we imported from Excel we get the Excel formatted dates)
+4.  Pricing for that particular day (7 different prices)
+5.  Display (This is a binary variable. 1 indicates that our product was on a display for that day. 0 indicates that it was not on display).
+6.  Actual sales
+
+```{r Create New Formatted Date Column}
+#Create New Formatted Date Column supplying origin argument
+postit$new_date <- as.Date(postit$Day, origin = "1899-12-30")
+
+
+#Check results
+str(postit$new_date)
+```
+
+```{r Rename columns so that it does not cause problems later}
+#Column renaming
+postit <- postit %>% 
+  rename(
+    day_num = 'Day#',
+    display = 'Display?'
+  )
+
+#Check results
+names(postit)
+```
+
+```{r Factor numeric variables}
+#Create list of variables that need transformation
+#fac_vars <- c("Month", "display", "Price")
+fac_vars <- c("Month", "display")
+
+#Factor Month, Display and Price Variables
+postit[,fac_vars] <- lapply(postit[,fac_vars], factor) 
+
+#Check results
+str(postit)
+```
+
+```{r Let us drop variables we no longer need}
+#Drop Excel formatted Day variable and day_num
+postit <- postit %>% 
+            select(-Day, -day_num)
+          
+```
+
+```{r Visualize sales over time}
+#From timetk package - visualize sales
+postit %>%
+  plot_time_series(new_date, actualsales, .interactive = TRUE)
+```
+
+Our plot of sales indicates that there is a positive trend of sales for our post its.
+
+Trend in time series data is a specific pattern which in which observations are either increasing or decreasing over time. Trends can constantly change.
+
+## Task 1: What factors influence sales
+
+```{r Data visualization}
+#Let's do some exploratory data analysis (EDA)
+ggplot(data = postit, aes(x=actualsales)) + geom_histogram() + theme_minimal()
+#Sales are a bit skewed to the right
+
+ggplot(data=postit, aes(x=log(actualsales))) + geom_histogram() + theme_minimal()
+#Sales now look more normal after log transformation
+
+ggplot(data = postit, aes(x=Month, y = actualsales)) + geom_boxplot() + theme_minimal()
+#Sales are lowest in March. Sales are generally higher in Q4 and the highest in December. December also appears to have the largest spread. Some outliers during months August and September.
+
+ggplot(data = postit, aes(x=Price, y = actualsales)) + geom_boxplot() + theme_minimal()
+#This is quite interesting, as sales are highest when the price is 5.95. Sales decrease when price increases to 6.1 and so and so forth where the lowest sales happen when the price is at its highest 7.52. There appears to be a relationship between price and sales.
+
+ggplot(data = postit, aes(x=display, y = actualsales)) + geom_boxplot() + theme_minimal()
+#More sales when product is on display. 
+
+postit %>%  
+  group_by(display) %>% 
+  summarize(mean_sales = mean(actualsales), median_sales = median(actualsales), sd_sales = sd(actualsales))
+#Average sales are 639 vs 587 when no display.
+```
+
+Now we have some idea of the factors that might influence sales, let's check for significance by using a linear regression model.
+
+```{r Model spec for linear regression model}
+# Model Spec
+model_spec_lm <- linear_reg() %>%
+    set_engine('lm') %>% 
+    set_mode('regression')
+```
+
+```{r Linear Regression Model Fit}
+# Fit Linear Regression Model
+model_fit_lm <- model_spec_lm %>%
+    fit(actualsales ~ Month + Price + display, data = postit)
+
+#Uncomment if want to run model with date as xreg
+# model_fit_lm <- model_spec_lm %>%
+#     fit(actualsales ~ Month + Price + display + as.numeric(new_date), data = postit)
+```
+
+```{r Print summary of model in a tidy object}
+#Print summary of model in a tidy object
+lm_summary <- tidy(model_fit_lm) %>% 
+              mutate(significant = p.value <= 0.05)
+lm_summary
+
+#Use the glance function from the broom package to get additional information from the model (e.g. model statitics like r.squared)
+(mod_glance <- glance(model_fit_lm))
+
+
+#If you prefer, you can use summary function to print output to console
+summary(model_fit_lm$fit)
+```
+
+A generic interpretation of a linear regression model. For every one unit change in coefficient (term column), moves unit sales by the value of our estimate while all other variables remain at the same level.
+
+Most months are significant but December is positive and the most statistically significant with the highest average sales. March is the month with the lowest average sales. Time of year does impact sales.
+
+All price coefficients are negative and significant which means that all price levels above 5.95 reduces sales and continues to reduce at each price increase. Customers seem to be price sensitive when it comes to post-its. As suggested by our EDA, there is a negative relationship between price and sales.
+
+For display advertising, we can expect an increase of 60 when there is a display.
+
+-Evaluate model fit
+
+As for the model statistics, we have a very low p-value and a pretty decent r.square of .885, which tells us that that 89% of the variation in sales is explained by our independent/explanatory variables.
+
+We built this linear model for mostly gaining insights into what factors influence sales.
+
+## Task 2: Build a forecast model for sales
+
+We will split our dataset into test and training data. We will use the last 12 months of the dataset as the training set.
+
+```{r Step 1: Time series split}
+
+#Step 1: Split data into test and training set
+splits <- postit %>%
+  time_series_split(date_var = new_date, assess = "12 months", cumulative = TRUE)
+
+#Visualize test train split
+splits %>%
+  tk_time_series_cv_plan() %>%
+  plot_time_series_cv_plan(new_date, actualsales, .interactive = TRUE)
+```
+
+```{r Step 2: Model Specification and Model Fit}
+# Step 2: Model Spec and Model Fit
+model_fit_prophet  <- prophet_reg() %>%
+    set_engine('prophet') %>% 
+  fit(actualsales ~ ., data = training(splits))
+
+model_fit_prophet
+```
+
+```{r Step 3: Put model output into a modeltime table}
+#Step 3: Put model into a modeltime table
+models_tbl <- modeltime_table(model_fit_prophet)
+
+models_tbl
+```
+
+```{r Step 4: Calibrate Model}
+#Step 4: Calibrate model
+calibration_tbl <- models_tbl %>% 
+  modeltime_calibrate(new_data = testing(splits))
+
+#Can also print calibration model to console
+calibration_tbl
+```
+
+```{r Step 5: Get accuracy metrics}
+#Step 5: Get Accuracy Metrics
+calibration_tbl %>%
+    modeltime_accuracy()
+
+#Plot the residuals
+# Out-of-Sample data (test set)
+#Change new_data argument if you want to plot in-sample residuals (training set). Timeplot is the default but can change to acf or seasonality plot.
+calibration_tbl %>%
+    modeltime_calibrate(new_data = testing(splits)) %>%
+    modeltime_residuals() %>%
+    plot_modeltime_residuals(.interactive = TRUE, .type = "timeplot", .legend_show = FALSE)
+
+#Statistical tests
+calibration_tbl %>%
+    modeltime_residuals_test(new_data = testing(splits))
+```
+
+modeltime_accuracy() function gives all accuracy metrics.
+
+I like to pay attention to the the mean absolute percentage error (MAPE) which is 6 so our forecasts are off around 6%.
+
+We want our time series residuals to hover around zero. Everything seems okay until November and December as we start to see more variability.
+
+```{r Step 6: Create future forecast on test set}
+#Step 6: Create future forecast on test data
+(forecast_tbl <- calibration_tbl %>%
+    modeltime_forecast(
+        new_data    = testing(splits),
+        actual_data = postit,
+        keep_data = TRUE #Includes the new data (and actual data) as extra columns with the results of the model forecasts
+    ))
+```
+
+```{r Step 7: Plot modeltime forecast}
+#Step 7: Plot modeltime forecast - this is the test data
+plot_modeltime_forecast(forecast_tbl)
+```
+
+## Forecast sales into the future
+
+```{r SIMULATED FORECAST: Create new tibble dataframe that will be used to predict future values}
+#Create a tibble of observations with length out being the number of observations we want in reference to our date variable (new_data). Since new_date ends on Dec 31st, our future_frame starts on Jan 1st counts what we put into our length_out argument into the future.
+#Create tibble of dates using future_frame() from timetk package
+dates <- postit %>% 
+  future_frame(new_date, .length_out = "1 year")
+
+#Simulate display data
+display <- rep(0:1, each = 2, length.out = 365)
+
+#Simulate Price data
+Price <- rep(c(5.95, 6.1, 6.2, 6.98, 7.12, 7.32, 7.52), length.out = 365)
+
+#Put data into dataframe
+explanatory_data <- cbind(dates, display, Price)
+
+#Add additional Month and day_num variables
+explanatory_data <- explanatory_data %>% 
+  mutate(Month = format(new_date, "%m"),
+         day_num = format(new_date, "%d"))
+
+#Need to factor variables 
+fac_vars <- c("Month", "display", "Price")
+
+#Factor Month, Display and Price Variables
+explanatory_data[,fac_vars] <- lapply(explanatory_data[,fac_vars], factor) 
+
+#Change day_num from character to numeric vector and strip leading zeros
+library(stringr)
+explanatory_data$day_num <- as.numeric(str_remove(explanatory_data$day_num, "^0+")) 
+
+#Do the same for the Month variable
+explanatory_data$Month <- as.factor(str_remove(explanatory_data$Month, "^0+"))
+
+# explanatory_data$day_num <- as.numeric(explanatory_data$day_num)
+
+#Check results
+str(explanatory_data)
+```
+
+```{r SCENARIO FORECAST: Uncomment to run - Create new tibble dataframe that will be used to predict future values based on prior information from our regression analysis}
+#Create a tibble of observations with length out being the number of observations we want in reference to our date variable (new_data). Since new_date ends on Dec 31st, our future_frame starts on Jan 1st counts what we put into our length_out argument into the future.
+
+# #Create tibble of dates using future_frame() from timetk package
+# dates <- postit %>%
+#   future_frame(new_date, .length_out = "1 year")
+# 
+# #Simulate Price data
+# #We will keep price constant at 5.95
+# Price <- rep(5.95, length.out = 365)
+# 
+# #Put dates and Price into data frame
+# explanatory_data <- cbind(dates, Price)
+# 
+# #Add additional Month and day_num variables
+# explanatory_data <- explanatory_data %>%
+#   mutate(Month = format(new_date, "%m"),
+#          day_num = format(new_date, "%d"))
+# 
+# #Simulate display data - we want to be purposeful and use display on months where sales are the lowest in order to boost sales - February, March & April
+# explanatory_data <- explanatory_data %>%
+#   mutate(display = ifelse(Month%in% c('02', '03', '04'), 1, 0))
+# 
+# #Check results
+# table(explanatory_data$display)
+# 
+# #Need to factor variables
+# fac_vars <- c("Month", "display", "Price")
+# 
+# #Factor Month, Display and Price Variables
+# explanatory_data[,fac_vars] <- lapply(explanatory_data[,fac_vars], factor)
+# 
+# #Change day_num from character to numeric vector and strip leading zeros
+# library(stringr)
+# explanatory_data$day_num <- as.numeric(str_remove(explanatory_data$day_num, "^0+"))
+# 
+# #Do the same for the Month variable
+# explanatory_data$Month <- as.factor(str_remove(explanatory_data$Month, "^0+"))
+# 
+# #Reorder columns
+# explanatory_data <- explanatory_data %>%
+#   select(Month, Price, display, new_date)
+# 
+# #Check results
+# str(explanatory_data)
+```
+
+CAUTION: It is super important that the data in your new data frame matches the exact same formatting of the data in the data used in building the forecast. If errors occur during either the model fit or forecasting phase, differently formatted data may be the culprit.
+
+```{r Create future forecasts on new dates}
+#First, refit to the full dataset
+refit_tbl <- calibration_tbl %>%
+  modeltime_refit(data = postit)
+
+#Specify the H or horizon argument to get a forecast into the future, after refitting model to the entire dataset, but if using xregs (independent regressors), you must create a new dataframe with the xregs to be used.
+
+#Forecast on the new tibble dataframe
+forecast_tbl_future_data <- refit_tbl %>%
+    modeltime_forecast(
+        new_data    = explanatory_data
+    )
+
+#Check results of forecast
+head(forecast_tbl_future_data)
+```
+
+```{r Plot the forecasts}
+#Plot and visualize the forecasts
+plot_modeltime_forecast(forecast_tbl_future_data, .interactive = TRUE)
+```
+
+## Data Visualization of forecasts for business stakeholders
+
+```{r Visualization - Table - Make a nice looking outputs for forecast if needed}
+# Install package if needed and load library
+if (!require("reactable")) install.packages("reactable")
+library(reactable)
+
+#Subset the date and prediction columns
+final_fc <- forecast_tbl_future_data %>%
+  select(.index, .value) %>% 
+  mutate(month_year = format(.index, "%m-%Y"))
+
+#Group by month and sum sales
+final_fc_gr <- final_fc %>% 
+  group_by(month_year) %>% 
+  summarize(sales = sum(.value))
+
+#Put forecasts into a nice and pretty table
+#I am using the reactable library
+fc_table <- final_fc_gr %>% 
+  reactable(resizable = TRUE, bordered = TRUE, defaultPageSize = 12, striped = TRUE, columns = list(
+sales = colDef(format = colFormat(prefix = "$", separators = TRUE, digits = 2))), theme = reactableTheme(stripedColor = "#e7edf5"))
+
+#Visualize table
+fc_table
+
+# Forecasts in a barplot
+ggplot(final_fc_gr, aes(x=month_year, y=sales)) + 
+  geom_bar(stat = "identity", fill="steelblue") + theme_calc() + ylab(" ") + xlab(" ") + ggtitle("2014 Sales Forecast", subtitle = "Assuming display and pricing structure remains unchanged from prior year") + theme(legend.position=c(0.2,.85), plot.title = element_text(family = "Arial", face = "bold", colour = "darkblue", size = 24, hjust = 0.5), plot.subtitle = element_text(hjust = 0.5)) 
+```
+
+```{r Visualization - Side-by-side bar chart}
+#Subset last year of postit data
+postit_2013 <- postit %>% 
+  filter(new_date >= "2013-01-01") %>% 
+  mutate(month_year = format(new_date, "%m-%Y"))
+  
+#Check results
+str(postit_2013)
+
+#Create grouped dataframe - group by month and sum sales
+postit_2013_gr <- postit_2013 %>% 
+  group_by(month_year) %>% 
+  summarize(sales = sum(actualsales))
+
+#Combine data into one dataframe - bind by row
+combined_df <- rbind(final_fc_gr, postit_2013_gr)
+
+#Add year variable
+combined_df <- combined_df %>% 
+  mutate(year_of_sales =
+    case_when(
+  grepl("2013", month_year) ~ 2013,
+  grepl("2014", month_year) ~ 2014)
+  )
+
+#Check results
+head(combined_df)
+
+#Bar plot using geom_col
+ggplot(combined_df, aes(x=sales, y = month_year, fill = factor(year_of_sales))) +
+  geom_col(position = "dodge")
+
+# Does the same as above using geom_bar
+ggplot(combined_df, aes(x=sales, y = factor(month_year), fill = factor(year_of_sales))) +
+  geom_bar(stat="identity", position=position_dodge()) + theme_minimal()
+
+```
+
+```{r Visualiztion - Line chart}
+#Prep 2013 sales data by renaming sales column
+postit_2013_gr_01 <- rename(postit_2013_gr, sales_2013 = sales, month_year_2013 = month_year)
+
+#Prep forecast data by renaming sales column
+final_fc_gr_01 <- rename(final_fc_gr, sales_2014_forecast = sales, month_year_2014 = month_year)
+
+#Combine data into one dataframe - bind by column
+combined_df_col <- cbind(postit_2013_gr_01, final_fc_gr_01)
+
+#Extract month column
+combined_df_col <- combined_df_col %>% 
+  mutate(month  =
+    case_when(
+  grepl("2013", month_year_2014) ~ 2013,
+  grepl("2014", month_year_2014) ~ 2014)
+  )
+
+#Extract a month column
+combined_df_col <- combined_df_col %>% 
+  mutate(month_of_yr  = month.name[as.numeric(substr(c(month_year_2013),1,2))],
+         month  = as.numeric(substr(c(month_year_2013),1,2)))
+
+#Check results
+combined_df_col
+
+#Plot the results
+ggplot(combined_df_col, aes(x=month)) + 
+  geom_line(aes(x=month, y = sales_2013, color = "sales_2013"), size=1) + 
+  geom_line(aes(x=month, y = sales_2014_forecast, color="sales_2014_forecast"), size=1, linetype="twodash")+ 
+  theme_calc() + 
+  ylab("  ") + 
+  ggtitle("Comparison of current annual sales with next year's forecasted sales", subtitle = "Assuming the same pricing and display promotions of the current year") +
+  scale_x_continuous(breaks = seq(from = 0, to = 12, by = 1)) +   
+  scale_color_manual(name = " ", values = c("sales_2013" = "darkred", "sales_2014_forecast" = "steelblue")) +
+  theme(legend.position=c(0.2,.85), plot.title = element_text(family = "Arial", face = "bold", colour = "darkblue", size = 24, hjust = 0.5), plot.subtitle = element_text(hjust = 0.5)) 
+
+```
+
+FINAL THOUGHTS:
+
+I really enjoyed performing time series analysis using Modeltime package. As a Tidyverse user, this way of working with machine learning models is streamlined, functional and flexible plus the added benefit of being able to compare many models at once.
