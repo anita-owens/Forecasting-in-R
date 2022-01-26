@@ -1,11 +1,10 @@
 ---
 title: "Forecasting with ANOVA in R"
+author: "Anita Owens"
 output:
   html_document:
     df_print: paged
 ---
-
-## How use one-way ANOVA for forecasting in R
 
 
 ## Set up environment
@@ -101,7 +100,7 @@ INTERPRETATION OF ONE-WAY ANOVA RESULT:
 The predicted mean for each group is the overall mean. The forecast will be weekly sales of irrespective of shelf location.
 
 
-```{r Forecast:  mean of sales with na's removed}
+```{r Forecast:  mean of sales with missing data removed}
 mean(books$sales, na.rm = TRUE)
 ```
 
