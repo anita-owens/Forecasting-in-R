@@ -26,8 +26,7 @@ pacman::p_load(pacman,
 Weekly sales (in hundreds)
 
 ```{r Import bookstore dataset}
-bookstore <- read.xlsx("C:/Users/waow1/OneDrive - Hilding Anders/Documents/R files/OnewayANOVA.xlsx", skipEmptyRows = TRUE, sheet = "insignificant")
-
+bookstore <- read.xlsx("~/Documents/GitHub/Forecasting-in-R/Forecasting-in-R/datasets/OnewayANOVA.xlsx", skipEmptyRows = TRUE, sheet = "insignificant")
 
 head(bookstore)
 ```
@@ -78,15 +77,12 @@ Bartlett variance test - p-value is very large, we can assume homogeneity of var
 (anova_results <- oneway.test(sales ~ location, data = books, var.equal = TRUE))
 
 #Extract p-value
-
 #If true, means are different. If false, mean sales are identical in all shelf positions.
 if(anova_results$p.value < 0.05){
   print("Means are different")
 } else{
   print("Means are not different")
 }
-
-
 ```
 
 Null hypothesis: Group means are equal
@@ -111,14 +107,13 @@ mean(books$sales, na.rm = TRUE)
 
 We can expect sales of 1,120 books to be sold per week.
 
-How to estimate accuracy of the forecast?
 
 
 
 ##Scenario 2: If one of the groups is significant
 
 ```{r import bookstore sales for scenario 2}
-bookstore2 <- read.xlsx("C:/Users/waow1/OneDrive - Hilding Anders/Documents/R files/OnewayANOVA.xlsx", skipEmptyRows = TRUE, sheet = "significant")
+bookstore2 <- read.xlsx("~/Documents/GitHub/Forecasting-in-R/Forecasting-in-R/datasets/OnewayANOVA.xlsx", skipEmptyRows = TRUE, sheet = "significant")
 
 head(bookstore2)
 ```
@@ -150,16 +145,10 @@ bartlett.test(sales ~ location, data = books2)
 anova_results2$p.value < 0.05 #If true, means are different. reject null hypothesis and alternative hypothesis is true. if false, mean sales are identical in all shelf positions.
 ```
 
-
-
 INTERPRETATION OF ONE-WAY ANOVA RESULT:
 The p-value is very small 0.003426 so we reject the null hypothesis and conclude that sales are significantly different.
 
-
-
-## Forecasting for scenario 2
-
-The predicted mean for each group equals the group mean
+## Forecasting for scenario 2: The predicted mean for each group equals the group mean
 
 ```{r Forecast mean of sales scenario 2 with not applicables removed}
 (booksales_forecast_signif <- books2 %>% 
