@@ -1,6 +1,14 @@
 ---
 title: "How to forecast product sales in the R Tidyverse with Modeltime and Prophet"
 author: "Anita Owens"
+output:
+  html_document:
+    df_print: paged
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+    toc_depth: 2
 ---
 
 We have 3 years of daily sales of Post-its. Those lovable note snippets that hang around your desk.
@@ -104,7 +112,8 @@ ggplot(data = postit, aes(x=Month, y = actualsales)) + geom_boxplot() + theme_mi
 ggplot(data = postit, aes(x=Price, y = actualsales)) + geom_boxplot() + theme_minimal()
 #This is quite interesting, as sales are highest when the price is 5.95. Sales decrease when price increases to 6.1 and so and so forth where the lowest sales happen when the price is at its highest 7.52. There appears to be a relationship between price and sales.
 
-ggplot(data = postit, aes(x=display, y = actualsales)) + geom_boxplot() + theme_minimal()
+ggplot(data = postit, aes(x=display, y = actualsales)) + geom_boxplot() + theme_minimal() + theme(plot.title = element_text(hjust = 0.5), plot.subtitle = element_text(hjust = 0.5)) + ggtitle("Product sales based on whether or not product was on store display",  subtitle = "(not on display = 0, on display = 1)") + ylab("Actual Sales") 
+
 #More sales when product is on display. 
 
 postit %>%  
