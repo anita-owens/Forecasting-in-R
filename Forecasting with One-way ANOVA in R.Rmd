@@ -4,6 +4,12 @@ author: "Anita Owens"
 output:
   html_document:
     df_print: paged
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+    toc_depth: 2
+      
 ---
 
 
@@ -20,7 +26,7 @@ pacman::p_load(pacman,
 ```
 
 
-##Scenario 1: If groups are insignificant
+# Scenario 1: If groups are insignificant
 
 Weekly sales (in hundreds)
 
@@ -46,7 +52,7 @@ books
 ```
 
 
-```{r visualize book sales}
+```{r visualize book sales, fig.align='center'}
 #set Wall Street Journal theme for all plots
 theme_set(theme_wsj())
 
@@ -95,9 +101,9 @@ INTERPRETATION OF ONE-WAY ANOVA RESULT:
     The p-value of the test is greater than the significance level alpha = 0.05. We can cannot conclude that sales are significantly different based on shelf height. (The p-value is higher than 5%, so we fail to reject the null hypothesis that the means across groups are equal). In other words, we accept the null hypothesis and conclude that sales are not significantly different across shelf positions.
     
 
-## Forecasting for scenario 1
+## Forecasting for scenario 1: The predicted mean for each group is the overall mean. 
 
-The predicted mean for each group is the overall mean. The forecast will be weekly sales of irrespective of shelf location.
+-The forecast will be weekly sales of irrespective of shelf location.
 
 
 ```{r Forecast:  mean of sales with missing data removed}
@@ -109,7 +115,7 @@ We can expect sales of 1,120 books to be sold per week.
 
 
 
-##Scenario 2: If one of the groups is significant
+# Scenario 2: If one of the groups is significant
 
 ```{r import bookstore sales for scenario 2}
 bookstore2 <- read.xlsx("~/Documents/GitHub/Forecasting-in-R/Forecasting-in-R/datasets/OnewayANOVA.xlsx", skipEmptyRows = TRUE, sheet = "significant")
@@ -125,7 +131,7 @@ mutate(week_num = row_number())  %>%
 ```
 
 
-```{r Plot scenario 2}
+```{r Plot scenario 2, fig.align='center'}
 ggplot(data = books2, aes(x=location, y=sales)) + geom_boxplot(na.rm=TRUE)+ ggtitle("Book sales by shelf location", subtitle = "scenario 2")
 ```
 
@@ -157,8 +163,8 @@ The p-value is very small 0.003426 so we reject the null hypothesis and conclude
 
 We can expect sales of 900 books to be sold per week when located at the front, 1100 per week when located at the middle and 1400 per week when located at the back of the book section.
 
-## Playground
-```{r Oneway ANOVA Significance Function}
+
+```{r Oneway ANOVA Significance Function, include=FALSE}
 oneway_sigif_function <- function(dataframe, y, x){
   result <- oneway.test(y ~ x, data = dataframe, var.equal = TRUE)
   if(result$p.value < 0.05){

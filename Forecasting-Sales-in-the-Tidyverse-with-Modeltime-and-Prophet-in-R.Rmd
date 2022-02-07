@@ -263,7 +263,8 @@ explanatory_data <- explanatory_data %>%
          day_num = format(new_date, "%d"))
 
 #Need to factor variables 
-fac_vars <- c("Month", "display", "Price")
+#fac_vars <- c("Month", "display", "Price")
+fac_vars <- c("Month", "display")
 
 #Factor Month, Display and Price Variables
 explanatory_data[,fac_vars] <- lapply(explanatory_data[,fac_vars], factor) 
@@ -453,7 +454,7 @@ ggplot(combined_df_col, aes(x=month)) +
   geom_line(aes(x=month, y = sales_2014_forecast, color="sales_2014_forecast"), size=1, linetype="twodash")+ 
   theme_calc() + 
   ylab("  ") + 
-  ggtitle("Comparison of current annual sales with next year's forecasted sales", subtitle = "Assuming the same pricing and display promotions of the current year") +
+  ggtitle("Comparison of current annual sales \n with next year's forecasted sales", subtitle = "Assuming the same pricing and display promotions of the current year") +
   scale_x_continuous(breaks = seq(from = 0, to = 12, by = 1)) +   
   scale_color_manual(name = " ", values = c("sales_2013" = "darkred", "sales_2014_forecast" = "steelblue")) +
   theme(legend.position=c(0.2,.85), plot.title = element_text(family = "Arial", face = "bold", colour = "darkblue", size = 24, hjust = 0.5), plot.subtitle = element_text(hjust = 0.5)) 
