@@ -67,7 +67,7 @@ postit <- postit %>%
 names(postit)
 ```
 
-```{r Factor numeric variables}
+```{r Factor some of our variables}
 #Create list of variables that need transformation
 #fac_vars <- c("Month", "display", "Price")
 fac_vars <- c("Month", "display")
@@ -109,7 +109,7 @@ ggplot(data=postit, aes(x=log(actualsales))) + geom_histogram() + theme_minimal(
 ggplot(data = postit, aes(x=Month, y = actualsales)) + geom_boxplot() + theme_minimal()
 #Sales are lowest in March. Sales are generally higher in Q4 and the highest in December. December also appears to have the largest spread. Some outliers during months August and September.
 
-ggplot(data = postit, aes(x=Price, y = actualsales)) + geom_boxplot() + theme_minimal()
+ggplot(data = postit, aes(x=factor(Price), y = actualsales)) + geom_boxplot() + theme_minimal()
 #This is quite interesting, as sales are highest when the price is 5.95. Sales decrease when price increases to 6.1 and so and so forth where the lowest sales happen when the price is at its highest 7.52. There appears to be a relationship between price and sales.
 
 ggplot(data = postit, aes(x=display, y = actualsales)) + geom_boxplot() + theme_minimal() + theme(plot.title = element_text(hjust = 0.5), plot.subtitle = element_text(hjust = 0.5)) + ggtitle("Product sales based on whether or not product was on store display",  subtitle = "(not on display = 0, on display = 1)") + ylab("Actual Sales") 
@@ -175,6 +175,8 @@ We will split our dataset into test and training data. We will use the last 12 m
 
 ```{r Step 1: Time series split}
 
+set.seed(123)
+
 #Step 1: Split data into test and training set
 splits <- postit %>%
   time_series_split(date_var = new_date, assess = "12 months", cumulative = TRUE)
@@ -212,8 +214,8 @@ calibration_tbl
 
 ```{r Step 5: Get accuracy metrics}
 #Step 5: Get Accuracy Metrics
-calibration_tbl %>%
-    modeltime_accuracy()
+(accuracy_table <- calibration_tbl %>%
+    modeltime_accuracy())
 
 #Plot the residuals
 # Out-of-Sample data (test set)
@@ -230,7 +232,7 @@ calibration_tbl %>%
 
 modeltime_accuracy() function gives all accuracy metrics.
 
-I like to pay attention to the the mean absolute percentage error (MAPE) which is 6 so our forecasts are off around 6%.
+I like to pay attention to the the mean absolute percentage error (MAPE) which is 12.76 so our forecasts are off around 13%.
 
 We want our time series residuals to hover around zero. Everything seems okay until November and December as we start to see more variability.
 
@@ -272,8 +274,7 @@ explanatory_data <- explanatory_data %>%
          day_num = format(new_date, "%d"))
 
 #Need to factor variables 
-#fac_vars <- c("Month", "display", "Price")
-fac_vars <- c("Month", "display")
+fac_vars <- c("Month", "display") #Price is numeric
 
 #Factor Month, Display and Price Variables
 explanatory_data[,fac_vars] <- lapply(explanatory_data[,fac_vars], factor) 
@@ -291,7 +292,7 @@ explanatory_data$Month <- as.factor(str_remove(explanatory_data$Month, "^0+"))
 str(explanatory_data)
 ```
 
-```{r SCENARIO FORECAST: Uncomment to run - Create new tibble dataframe that will be used to predict future values based on prior information from our regression analysis}
+```{r SCENARIO FORECAST: Uncomment to run - Create new tibble dataframe that will be used to predict future values based on prior information from our regression analysis, include = FALSE}
 #Create a tibble of observations with length out being the number of observations we want in reference to our date variable (new_data). Since new_date ends on Dec 31st, our future_frame starts on Jan 1st counts what we put into our length_out argument into the future.
 
 # #Create tibble of dates using future_frame() from timetk package
@@ -364,7 +365,7 @@ plot_modeltime_forecast(forecast_tbl_future_data, .interactive = TRUE)
 
 ## Data Visualization of forecasts for business stakeholders
 
-```{r Visualization - Table - Make a nice looking outputs for forecast if needed}
+```{r Visualization - Table - Make a nice looking outputs for forecast if needed, include = FALSE}
 # Install package if needed and load library
 if (!require("reactable")) install.packages("reactable")
 library(reactable)
@@ -393,7 +394,7 @@ ggplot(final_fc_gr, aes(x=month_year, y=sales)) +
   geom_bar(stat = "identity", fill="steelblue") + theme_calc() + ylab(" ") + xlab(" ") + ggtitle("2014 Sales Forecast", subtitle = "Assuming display and pricing structure remains unchanged from prior year") + theme(legend.position=c(0.2,.85), plot.title = element_text(family = "Arial", face = "bold", colour = "darkblue", size = 24, hjust = 0.5), plot.subtitle = element_text(hjust = 0.5)) 
 ```
 
-```{r Visualization - Side-by-side bar chart}
+```{r Visualization - Side-by-side bar chart, include = FALSE}
 #Subset last year of postit data
 postit_2013 <- postit %>% 
   filter(new_date >= "2013-01-01") %>% 
@@ -462,7 +463,7 @@ ggplot(combined_df_col, aes(x=month)) +
   geom_line(aes(x=month, y = sales_2013, color = "sales_2013"), size=1) + 
   geom_line(aes(x=month, y = sales_2014_forecast, color="sales_2014_forecast"), size=1, linetype="twodash")+ 
   theme_calc() + 
-  ylab("  ") + 
+  ylab("sales") + 
   ggtitle("Comparison of current annual sales \n with next year's forecasted sales", subtitle = "Assuming the same pricing and display promotions of the current year") +
   scale_x_continuous(breaks = seq(from = 0, to = 12, by = 1)) +   
   scale_color_manual(name = " ", values = c("sales_2013" = "darkred", "sales_2014_forecast" = "steelblue")) +

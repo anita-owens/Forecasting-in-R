@@ -88,7 +88,6 @@ normality_function(games_long$sales, games_long$advertising, shapiro.test)
 # Test normality across groups (Shapiro)
 tapply(games_long$sales, games_long$advertising, FUN = shapiro.test)
 
-
 tapply(games_long$sales, games_long$price, FUN = shapiro.test)
 ```
 
