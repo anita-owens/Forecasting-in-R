@@ -31,7 +31,7 @@ pacman::p_load(pacman,
 Weekly sales (in hundreds)
 
 ```{r Import bookstore dataset}
-bookstore <- read.xlsx("~/Documents/GitHub/Forecasting-in-R/Forecasting-in-R/datasets/OnewayANOVA.xlsx", skipEmptyRows = TRUE, sheet = "insignificant")
+bookstore <- read.xlsx("datasets/OnewayANOVA.xlsx", skipEmptyRows = TRUE, sheet = "insignificant")
 
 head(bookstore)
 ```

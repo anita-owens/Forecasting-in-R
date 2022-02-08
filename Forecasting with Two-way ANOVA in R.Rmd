@@ -30,7 +30,7 @@ pacman::p_load(pacman,
 
 
 ```{r Import games dataset}
-games <- read.xlsx("~/Documents/GitHub/Forecasting-in-R/Forecasting-in-R/datasets/games.xlsx", sheet = 3)
+games <- read.xlsx("datasets/games.xlsx", sheet = 3)
 ```
 
 

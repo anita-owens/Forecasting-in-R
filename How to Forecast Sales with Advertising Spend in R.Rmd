@@ -1,6 +1,8 @@
 ---
 title: "How to forecast sales with advertising spend in R"
-output: html_notebook
+output:
+  html_document:
+    df_print: paged
 ---
 
 
@@ -16,7 +18,7 @@ pacman::p_load(pacman,
 
 ```{r Import diet product ad data}
 #Import dataset
-diet <- read.xlsx("~/Documents/GitHub/Forecasting-in-R/Forecasting-in-R/datasets/Addata.xlsx", skipEmptyRows = TRUE)
+diet <- read.xlsx("datasets/Addata.xlsx", skipEmptyRows = TRUE)
 
 ```
 

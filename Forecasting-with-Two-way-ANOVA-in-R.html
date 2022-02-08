@@ -264,7 +264,7 @@ pacman::p_load(pacman,
   tidyverse, openxlsx, ggpubr)</code></pre>
 <div id="scenario-if-there-is-interaction-between-the-groups" class="section level2">
 <h2>Scenario: If there is interaction between the groups</h2>
-<pre class="r"><code>games &lt;- read.xlsx(&quot;~/Documents/GitHub/Forecasting-in-R/Forecasting-in-R/datasets/games.xlsx&quot;, sheet = 3)</code></pre>
+<pre class="r"><code>games &lt;- read.xlsx(&quot;datasets/games.xlsx&quot;, sheet = 3)</code></pre>
 <pre class="r"><code>games</code></pre>
 <div data-pagedtable="false">
 <script data-pagedtable-source type="application/json">
@@ -290,6 +290,33 @@ str(games_long)</code></pre>
 ##  $ price      : Factor w/ 3 levels &quot;PriceLow&quot;,&quot;PriceMedium&quot;,..: 1 2 3 1 2 3 1 2 3 1 ...
 ##  $ sales      : num [1:27] 41 21 15 25 20 14 23 16 13 28 ...
 ##  $ advertising: Factor w/ 3 levels &quot;Low&quot;,&quot;Medium&quot;,..: 1 1 1 1 1 1 1 1 1 2 ...</code></pre>
+<pre class="r"><code>normality_function &lt;- function(y, x, stat_test){
+  result &lt;- tapply(y, x, stat_test)
+  for(i in 1:length(result)){
+    if(result[[i]][[2]] &lt; 0.05){
+      print(&quot;Not normal distribution&quot;)
+    } else{
+      print(&quot;Distributions are normal&quot;)
+    }
+  }
+}
+
+# normality_function &lt;- function(y, x, stat_test){
+#   result &lt;- tapply(y, x, stat_test)
+#   for(i in 1:length(result)){
+#     if(result[[i]][[2]] &lt; 0.05){
+#       print(paste(&quot;Not normal distribution&quot;, names(result), sep = &quot; &quot;))
+#     } else{
+#       print(&quot;Distributions are normal&quot;)
+#     }
+#   }
+# }
+
+normality_function(games_long$sales, games_long$advertising, shapiro.test)</code></pre>
+<pre><code>## [1] &quot;Not normal distribution&quot;
+## [1] &quot;Distributions are normal&quot;
+## [1] &quot;Distributions are normal&quot;</code></pre>
+<pre class="r"><code>#normality_function(games_long$sales, games_long$price, shapiro.test)</code></pre>
 <pre class="r"><code># Test normality across groups (Shapiro)
 tapply(games_long$sales, games_long$advertising, FUN = shapiro.test)</code></pre>
 <pre><code>## $Low
@@ -372,15 +399,43 @@ summary(two_way_aov)</code></pre>
 ## Residuals         18  308.0    17.1                     
 ## ---
 ## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
+<pre class="r"><code>lm_model &lt;- lm(sales ~  advertising*price, data = games_long)
+summary(lm_model)</code></pre>
+<pre><code>## 
+## Call:
+## lm(formula = sales ~ advertising * price, data = games_long)
+## 
+## Residuals:
+##    Min     1Q Median     3Q    Max 
+## -6.667 -1.167  0.000  1.000 11.333 
+## 
+## Coefficients:
+##                                    Estimate Std. Error t value Pr(&gt;|t|)    
+## (Intercept)                         29.6667     2.3882  12.422 2.89e-10 ***
+## advertisingMedium                    0.3333     3.3775   0.099 0.922473    
+## advertisingHigh                     21.3333     3.3775   6.316 5.93e-06 ***
+## pricePriceMedium                   -10.6667     3.3775  -3.158 0.005440 ** 
+## pricePriceHigh                     -15.6667     3.3775  -4.639 0.000204 ***
+## advertisingMedium:pricePriceMedium   3.3333     4.7765   0.698 0.494180    
+## advertisingHigh:pricePriceMedium    -5.0000     4.7765  -1.047 0.309048    
+## advertisingMedium:pricePriceHigh    -1.3333     4.7765  -0.279 0.783315    
+## advertisingHigh:pricePriceHigh     -22.3333     4.7765  -4.676 0.000188 ***
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+## 
+## Residual standard error: 4.137 on 18 degrees of freedom
+## Multiple R-squared:  0.9257, Adjusted R-squared:  0.8927 
+## F-statistic: 28.03 on 8 and 18 DF,  p-value: 1.233e-08</code></pre>
 <p>How do we use this information to forecast?</p>
 <p>Since the p-value for the interaction (advertising*price) is very small, we can forecast sales for any price and advertising combination equal to the mean of the observations.</p>
 <pre class="r"><code>games_long %&gt;% 
   group_by(advertising, price) %&gt;% 
-  summarize(forecast_sales = mean(sales))</code></pre>
+  summarize(forecast_sales = round(mean(sales),2),
+            stand_dev = round(sd(sales),2))</code></pre>
 <pre><code>## `summarise()` has grouped output by &#39;advertising&#39;. You can override using the `.groups` argument.</code></pre>
 <div data-pagedtable="false">
 <script data-pagedtable-source type="application/json">
-{"columns":[{"label":["advertising"],"name":[1],"type":["fct"],"align":["left"]},{"label":["price"],"name":[2],"type":["fct"],"align":["left"]},{"label":["forecast_sales"],"name":[3],"type":["dbl"],"align":["right"]}],"data":[{"1":"Low","2":"PriceLow","3":"29.66667"},{"1":"Low","2":"PriceMedium","3":"19.00000"},{"1":"Low","2":"PriceHigh","3":"14.00000"},{"1":"Medium","2":"PriceLow","3":"30.00000"},{"1":"Medium","2":"PriceMedium","3":"22.66667"},{"1":"Medium","2":"PriceHigh","3":"13.00000"},{"1":"High","2":"PriceLow","3":"51.00000"},{"1":"High","2":"PriceMedium","3":"35.33333"},{"1":"High","2":"PriceHigh","3":"13.00000"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+{"columns":[{"label":["advertising"],"name":[1],"type":["fct"],"align":["left"]},{"label":["price"],"name":[2],"type":["fct"],"align":["left"]},{"label":["forecast_sales"],"name":[3],"type":["dbl"],"align":["right"]},{"label":["stand_dev"],"name":[4],"type":["dbl"],"align":["right"]}],"data":[{"1":"Low","2":"PriceLow","3":"29.67","4":"9.87"},{"1":"Low","2":"PriceMedium","3":"19.00","4":"2.65"},{"1":"Low","2":"PriceHigh","3":"14.00","4":"1.00"},{"1":"Medium","2":"PriceLow","3":"30.00","4":"2.00"},{"1":"Medium","2":"PriceMedium","3":"22.67","4":"5.03"},{"1":"Medium","2":"PriceHigh","3":"13.00","4":"1.00"},{"1":"High","2":"PriceLow","3":"51.00","4":"1.00"},{"1":"High","2":"PriceMedium","3":"35.33","4":"4.16"},{"1":"High","2":"PriceHigh","3":"13.00","4":"0.00"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
   </script>
 </div>
 <p>A key insight for marketing stakeholders, would be to cut back on advertising when the price is high.</p>

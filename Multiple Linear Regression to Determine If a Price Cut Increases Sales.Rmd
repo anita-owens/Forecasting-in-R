@@ -1,6 +1,14 @@
 ---
 title: "Do price cuts increase sales?"
-output: html_notebook
+author: "Anita Owens"
+output:
+  html_document:
+    df_print: paged
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+    toc_depth: 2
 ---
 
 ## 1. Background
@@ -21,14 +29,18 @@ Predict sales of canned tomatoes during a week in which you use a shopping cart 
 
 
 ```{r Load packages}
-library(tidyverse)
-library(openxlsx)
+# Install pacman if needed
+if (!require("pacman")) install.packages("pacman")
+
+# load packages
+pacman::p_load(pacman,
+  tidyverse, openxlsx)
 ```
 
 
 ```{r Load Data}
 
-grocery <- read.xlsx("/Users/anitaowens/Documents/Marketing Analytics-Data Driven Techniques with Excel/Excel Files/Chapter 10 Excel Files/Grocery.xlsx")
+grocery <- read.xlsx("datasets/Grocery.xlsx")
 ```
 
 
@@ -149,9 +161,8 @@ augment(grocery_model_lm_signifvars, newdata = new_data_02)
 
 Using significant variables gives us 36.58 predicted sales.
 
-## Extras
 
-```{r Use contrasts function to view factor type variable details}
+```{r Use contrasts function to view factor type variable details, eval=FALSE, include=FALSE}
 
 contrasts(grocery$Price.Reduction)
 ```

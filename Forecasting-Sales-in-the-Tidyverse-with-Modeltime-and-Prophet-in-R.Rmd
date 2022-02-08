@@ -31,7 +31,7 @@ pacman::p_load(pacman,
 
 ```{r Import daily sales data}
 #Import data
-postit <- read.xlsx("~/Documents/GitHub/Forecasting-in-R/Forecasting-in-R/datasets/POSTITDATA.xlsx", skipEmptyRows = TRUE)
+postit <- read.xlsx("datasets/POSTITDATA.xlsx", skipEmptyRows = TRUE)
 
 #Check results
 str(postit)

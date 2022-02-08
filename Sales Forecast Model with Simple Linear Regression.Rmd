@@ -1,17 +1,29 @@
 ---
 title: "Sales Forecast Model - Linear Regression"
-output: html_notebook
+author: "Anita Owens"
+output:
+  html_document:
+    df_print: paged
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+    toc_depth: 2
 ---
 
 
 ```{r Load packages}
-library(tidyverse)
-library(openxlsx)
+# Install pacman if needed
+if (!require("pacman")) install.packages("pacman")
+
+# load packages
+pacman::p_load(pacman,
+  tidyverse, openxlsx)
 ```
 
 
 ```{r Load file}
-oreos <- read.xlsx("~/Documents/GitHub/Machine-Learning-R/Machine-Learning-R/datasets/Oreos.xlsx", skipEmptyRows = TRUE)
+oreos <- read.xlsx("datasets/Oreos.xlsx", skipEmptyRows = TRUE)
 ```
 
 
