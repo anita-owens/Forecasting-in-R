@@ -1,8 +1,14 @@
 ---
 title: "How to forecast sales with advertising spend in R"
+author: "Anita Owens"
 output:
   html_document:
     df_print: paged
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+    toc_depth: 2
 ---
 
 
@@ -23,7 +29,7 @@ diet <- read.xlsx("datasets/Addata.xlsx", skipEmptyRows = TRUE)
 ```
 
 
-## Date exploration
+## Explore data
 
 ```{r Check results of diet data import}
 #Check results

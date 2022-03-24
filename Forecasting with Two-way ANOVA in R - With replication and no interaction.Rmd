@@ -1,0 +1,141 @@
+---
+title: "Forecasting with Two-Way ANOVA in R - With Replication and No Interaction"
+author: "Anita Owens"
+output:
+  html_document:
+    df_print: paged
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+    toc_depth: 2
+---
+
+Question: Do coupons and advertising affects peanut butter sales?
+
+## 1. Set up environment
+
+```{r Load packages}
+# Install pacman if needed
+if (!require("pacman")) install.packages("pacman")
+
+# load packages
+pacman::p_load(pacman,
+  tidyverse, openxlsx, ggpubr)
+```
+
+## 2. Load data
+
+```{r Import peanutbutter dataset}
+#Dataset is in datasets subfolder
+(peanutbutter <- read.xlsx("datasets/Coupondata.xlsx"))
+```
+
+```{r Lowercase column names}
+#Lowercase column names
+(peanutbutter<- rename_with(peanutbutter, tolower))
+```
+
+```{r Pivot data from wide to long dataset}
+#Pivot data from wide to long dataset
+(peanutbutter_long <- peanutbutter %>% 
+  pivot_longer(!advertising, names_to = "coupon", values_to = "sales"))
+```
+
+## 3. Data Visualization
+
+```{r Plot sales vs advertising colored by coupon}
+#Plot using ggpubr
+ggline(peanutbutter_long, x = "advertising", y = "sales", 
+       add = c("mean_se", "jitter"),
+       color = "coupon", palette = "startrek",
+       title = "Sales increase when ad spending increases",
+       subtitle = "(Advertising and coupon do not interact) ",
+       legend.title = "coupon status"
+       )
+```
+
+## 4. Two-way ANOVA
+
+```{r Two-way ANOVA table}
+two_way_aov <- aov(sales ~ advertising*coupon, data = peanutbutter_long)
+
+#The anova table
+summary(two_way_aov)
+```
+
+Since the p-values for the main effects advertising and then coupon are small and the interaction (advertising\*coupon) is very large. Advertising and coupon factors (separately) increases sales.
+
+## 5. AOV Model Diagnostics
+
+```{r Plot the model diagnostics}
+#Diagnostic plots
+#plot(two_way_aov)
+
+hist(two_way_aov$residuals, prob = TRUE)
+lines(density(two_way_aov$residuals))
+
+qqnorm(two_way_aov$residuals)
+qqline(two_way_aov$residuals)
+```
+
+## 6. Forecast
+
+```{r What we can expect in sales?}
+#What we can expect in sales when there is advertising vs. no advertising
+peanutbutter_long %>% 
+  group_by(advertising) %>% 
+  summarize(sales_forecast = round(mean(sales),2),
+            std_dev = round(sd(sales),2))
+#What we can expect in sales when there is a coupon vs no coupon
+peanutbutter_long %>% 
+  group_by(coupon) %>% 
+  summarize(sales_forecast = round(mean(sales),2),
+            std_dev = round(sd(sales),2))
+```
+
++---------------------------------+----------------------------------+
+| Sales with:                     | Forecast                         |
++:================================+:=================================+
+| No advertising                  | 80.67                            |
++---------------------------------+----------------------------------+
+| With advertising                | 158.33                           |
++---------------------------------+----------------------------------+
+| No coupon                       | 109                              |
++---------------------------------+----------------------------------+
+| With coupon                     | 130                              |
++---------------------------------+----------------------------------+
+
+[***Ads tends to increase sales by 78 (158.33 - 80.67) over no ad and coupon tends to increase sales by 21 (130 - 109) over no coupon.***]{.ul}
+
+So in the case of peanut butter sales, if we wanted to predict peanut butter sales with both coupon and advertising we can use the following equation:
+
+> predicted sales = overall average + factor A effect (if significant) + factor B effect (if significant)
+
+```{r Forecast when there is both advertising and a coupon}
+#Calculate the overall average
+overall_avg <- mean(peanutbutter_long$sales)
+paste("The overall sales average is", overall_avg, sep=" ")
+
+#Calculate advertising effect
+adv_effect <- (158.33 - 80.67)
+
+#Calculate coupon effect
+coupon_effect <- (130-109)
+
+#Calculate Forecast:
+#predicted value = overall average + factor A effect (if significant) + factor B effect (if significant)
+predicted_sales <- overall_avg + adv_effect + coupon_effect
+
+paste("Forecast when there is both advertising and a coupon is:", predicted_sales, sep = " ")
+```
+
+## 7. Final Summary
+
+The forecast equation we can use to predict with two-way ANOVA (with or without replication) is the:
+
+> predicted value = overall average + factor A effect (if significant) + factor B effect (if significant)
+
+If a factor is **not significant** than the factor effect is assumed to be 0.
+
+Two-way ANOVA (with replication), if interaction effect **is significant**, then the predicted value is the value of the response variable (y) is equal to the mean of all observations having that combination of factor levels. If interaction effect, **is not significant**, you can proceed with your analysis as if it were two-way ANOVA without replication scenario.

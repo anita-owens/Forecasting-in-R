@@ -26,27 +26,30 @@ pacman::p_load(pacman,
 oreos <- read.xlsx("datasets/Oreos.xlsx", skipEmptyRows = TRUE)
 ```
 
+## Inspect data
 
 ```{r How does shelf position influence Oreos sale}
 head(oreos)
 ```
 
+```{r Visualize sales across shelf positions}
+ggplot(data = oreos, aes(x=factor(Height.in.feet), y = Sales)) + geom_boxplot() + theme_minimal()
+```
 
+
+## Build Regression Model
 
 ```{r Build Linear Regression Model}
-
 # Sales as explained by height in feet; must specify dataset
 oreo_model_lm <-  lm(Sales ~ factor(Height.in.feet), data = oreos) 
 
 ```
 
-
+## Summary output
 
 ```{r Summarize regression model}
-
 #Print model summary
 oreo_model_lm %>% summary()
-
 ```
 
 
@@ -77,12 +80,10 @@ Luckily, for us we can use R to do the math for us.
 
 #Call predict - vector of predictions
 predict(oreo_model_lm, explan_oreos)
-
 ```
 
 
 ```{r Create dataframe with our predictions}
-
 #Put predictions inside a data frame
 prediction_oreo <- explan_oreos  %>% 
   mutate(forecast_sales = predict(oreo_model_lm, explan_oreos))
@@ -96,6 +97,7 @@ head(prediction_oreo)
 ```
 
 
+## Build forecast
 
 ```{r Summarize sales data on our forecast}
 prediction_oreo %>% 

@@ -1,0 +1,148 @@
+---
+title: "Forecasting with Two-Way ANOVA in R - When interaction is absent"
+output:
+  html_document:
+    df_print: paged
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+    toc_depth: 2
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+## 1. Set up environment
+
+```{r Load packages}
+# Install pacman if needed
+if (!require("pacman")) install.packages("pacman")
+
+# load packages
+pacman::p_load(pacman,
+  tidyverse, openxlsx, ggpubr)
+```
+
+## 2. Load data
+
+```{r Import sales dataset}
+#Dataset is in datasets subfolder
+(sales <- read.xlsx("datasets/Twowayanova.xlsx", sheet = "no_interaction"))
+```
+
+```{r Pivot data from wide to long dataset}
+(sales_long <- sales %>% 
+  pivot_longer(cols = starts_with("Price"), #columns to pivot to rows
+               names_to = "price", #name the new column for the price variable
+               values_to = "sales"))
+```
+
+## 3. Data Visualization
+
+```{r Plot sales vs advertising colored by coupon}
+#Plot using ggpubr
+ggline(sales_long, x = "Advertising", y = "sales", 
+       add = c("mean_se", "jitter"),
+       color = "price", palette = "startrek",
+       title = "Sales increase when ad spending increases at roughly the same rate",
+       subtitle = "(no interaction as the curves in the graph are nearly parallel) ",
+       legend.title = "Price Level"
+       )
+```
+
+## 4. Two-way ANOVA (with replication)
+
+```{r Two-way ANOVA table}
+two_way_aov <- aov(sales ~ Advertising*price, data = sales_long)
+
+#The anova table
+summary(two_way_aov)
+```
+
+Since the p-values for the main effects advertising and then price are
+small and the interaction (advertising*price) is very large.
+Advertising and price factors (separately) impact sales. **Advertising
+has an effect that is independent of price.**
+
+## 5. AOV Model Diagnostics
+
+```{r Plot the model diagnostics}
+#Diagnostic plots
+plot(two_way_aov)
+
+hist(two_way_aov$residuals, prob = TRUE)
+lines(density(two_way_aov$residuals))
+
+qqnorm(two_way_aov$residuals)
+qqline(two_way_aov$residuals)
+```
+
+## 6. Forecast
+
+```{r What we can expect in sales?}}
+#What we can expect in sales when there is advertising vs. no advertising
+(ads <- sales_long %>% 
+  group_by(Advertising) %>% 
+  summarize(sales_forecast = round(mean(sales),2),
+            std_dev = round(sd(sales),2)))
+#What we can expect in sales when the price is low medium or high
+(price <- sales_long %>% 
+  group_by(price) %>% 
+  summarize(sales_forecast = round(mean(sales),2),
+            std_dev = round(sd(sales),2)))
+```
+
++----------------------+----------------------------+
+| Predicted sales      | What we can expect in      |
+| with:                | sales                      |
++:=====================+:===========================+
+| High advertising     | 32.44                      |
++----------------------+----------------------------+
+| Medium advertising   | 23.33                      |
++----------------------+----------------------------+
+| Low advertising      | 19.44                      |
++----------------------+----------------------------+
+| High price           | 16.33                      |
++----------------------+----------------------------+
+| Medium price         | 24.78                      |
++----------------------+----------------------------+
+| Low price            | 34                         |
++----------------------+----------------------------+
+
+So in the case of sales, if we wanted to predict sales where both price
+and advertising are significant and independent, we can use the
+following equation:
+
+> predicted sales = overall average + factor A effect (if significant) +
+> factor B effect (if significant)
+
+```{r Forecast when price is high and advertising is medium}
+#Calculate the overall average
+overall_avg <- round(mean(sales_long$sales),2)
+paste("The overall sales average is", overall_avg, sep=" ")
+
+#Calculate medium advertising effect
+#Equivalent to (23.22 - 25.03704)
+medium_adv_effect <- as.numeric(ads %>% filter(Advertising=="Medium") %>% select(sales_forecast)) - overall_avg
+
+#Calculate high price effect
+#Equivalent to (16.33 - 25.03704)
+price_high_effect <- as.numeric(price %>% filter(price=="PriceHigh") %>% select(sales_forecast)) - overall_avg
+
+#Calculate Forecast:
+#predicted value = overall average + factor A effect (if significant) + factor B effect (if significant)
+predicted_sales <- overall_avg + medium_adv_effect + price_high_effect
+
+paste("Forecast when price is high and advertising is medium is:", predicted_sales, sep = " ")
+```
+
+## 7. Final Summary
+
+The forecast equation we can use to predict with two-way ANOVA is:
+
+> predicted sales = overall average + factor A effect (if significant) +
+> factor B effect (if significant)
+
+If a factor is **not significant** than the factor effect is **assumed
+to be 0.**

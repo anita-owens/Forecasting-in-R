@@ -1,0 +1,10 @@
+advertising,price,forecast
+Low,PriceLow,29.67
+Low,PriceMedium,19
+Low,PriceHigh,14
+Medium,PriceLow,30
+Medium,PriceMedium,22.67
+Medium,PriceHigh,13
+High,PriceLow,51
+High,PriceMedium,35.33
+High,PriceHigh,13

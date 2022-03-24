@@ -1,0 +1,147 @@
+---
+title: "Forecasting with Two-Way ANOVA in R - When interaction is present"
+author: "Anita Owens"
+output:
+  html_document:
+    df_print: paged
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+    toc_depth: 2
+---
+
+## 1. Set up environment
+
+```{r Load packages}
+# Install pacman if needed
+if (!require("pacman")) install.packages("pacman")
+
+# load packages
+pacman::p_load(pacman,
+  tidyverse, openxlsx, ggpubr)
+```
+
+## 2. Import data
+
+```{r Import games dataset}
+#Dataset is in subfolder
+(games <- read.xlsx("datasets/games.xlsx", sheet = 3))
+```
+
+```{r Make dataset long}
+(games_long <- games %>% 
+  pivot_longer(cols = starts_with("Price"), #columns to pivot to rows
+               names_to = "price", #name the new column for the price variable
+               values_to = "sales")) #the new sales column
+```
+
+```{r Re-level categorical variables}
+games_long <- games_long %>% 
+  mutate(advertising = factor(Advertising, levels = c("Low", "Medium", "High")),
+  price = factor(price, levels = c("PriceLow", "PriceMedium", "PriceHigh"))) %>% 
+  select(-Advertising)
+
+str(games_long)
+```
+
+
+## 3. Visualize Data
+
+```{r Visualize sales by advertising spend and price}
+#Plot using ggpubr
+ggline(games_long, x = "advertising", y = "sales", 
+       add = c("mean_se", "jitter"),
+       color = "price", palette = "jco",
+       title = "Sales increase when ad spending increases",
+       subtitle = "(but not when prices are high)",
+       legend.title = "price levels"
+       )
+```
+
+## 4. Two-way ANOVA model
+
+The aov function models each combination of advertising and price on sales.
+
+The f-values and p-values suggests that we reject the null hypothesis for advertising, price, and the interaction between advertising and price.
+
+```{r Two-way ANOVA model}
+two_way_aov <- aov(sales ~ advertising*price, data = games_long)
+
+#The anova table
+summary(two_way_aov)
+```
+
+How do we use this information from the aov table to forecast?
+
+Since the p-value for the interaction (advertising\*price) is very small, we can forecast sales for any price and advertising combination equal to the mean of the observations.
+
+```{r Equivalent to two-way aov but using lm() function, include = FALSE}
+lm_model <- lm(sales ~  advertising*price, data = games_long)
+summary(lm_model)
+```
+
+## 5. Model Diagnostics
+
+```{r Model Diagnositic - Are ANOVA assumptions met}
+#histogram with kernel density line
+#hist(two_way_aov$residuals, prob = TRUE)
+#lines(density(two_way_aov$residuals))
+
+#However, when you have a small dataset it's better to visualize the residuals using qqplot.
+qqnorm(two_way_aov$residuals)
+qqline(two_way_aov$residuals)
+#We have a few points quite far away from the line
+```
+
+## 6. Sales Forecast Table
+
+```{r Forecast}
+(forecast_tab <- games_long %>% 
+  group_by(advertising, price) %>% 
+  summarize(forecast_sales = round(mean(sales),2),
+            std_dev = round(sd(sales),2)))
+
+#Write to csv file
+write.csv(forecast_tab,"datasets/games_forecast.csv", row.names = FALSE)
+```
+
+Because the p-value for the interaction is low, we have a significant interaction between advertising and price. Forecast if advertising is high and price is medium is 35.33
+
+## 7. Final Summary
+
+A key insight for marketing stakeholders, would be to cut back on advertising when the price is high.
+
+Two-way ANOVA (with replication), if interaction effect **is significant**, then the predicted value is the value of the response variable (y) is equal to the mean of all observations having that combination of factor levels.
+
+
+```{r Normality function - Check for normality in games dataset, include=FALSE}
+normality_function <- function(y, x, stat_test){
+  result <- tapply(y, x, stat_test)
+  for(i in 1:length(result)){
+    if(result[[i]][[2]] < 0.05){
+      print("Not normal distribution")
+    } else{
+      print("Distributions are normal")
+    }
+  }
+}
+
+normality_function(games_long$sales, games_long$advertising, shapiro.test)
+```
+
+```{r Check for normality in games dataset - the long way, include=FALSE}
+# Test normality across groups (Shapiro)
+tapply(games_long$sales, games_long$advertising, FUN = shapiro.test)
+
+tapply(games_long$sales, games_long$price, FUN = shapiro.test)
+```
+
+
+
+```{r Check homogeneity of variance in games dataset, include=FALSE}
+# Check the homogeneity of variance (Bartlett)
+bartlett.test(sales ~ advertising, data = games_long)
+bartlett.test(sales ~ price, data = games_long)
+#Both p-values are very large so homogeneity of variance is okay.
+```
