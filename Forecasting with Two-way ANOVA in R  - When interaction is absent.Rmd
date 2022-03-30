@@ -69,11 +69,6 @@ has an effect that is independent of price.**
 
 ```{r Plot the model diagnostics}
 #Diagnostic plots
-plot(two_way_aov)
-
-hist(two_way_aov$residuals, prob = TRUE)
-lines(density(two_way_aov$residuals))
-
 qqnorm(two_way_aov$residuals)
 qqline(two_way_aov$residuals)
 ```
