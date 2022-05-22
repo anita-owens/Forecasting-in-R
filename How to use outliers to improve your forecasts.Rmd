@@ -1,0 +1,220 @@
+---
+title: "How to use outliers to improve your forecasts. Forecasting customer demand with holidays and special events in R"
+author: "Anita Owens"
+output:
+  html_document:
+    df_print: paged
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+    toc_depth: 2
+---
+
+
+### Questions to answer:
+
+**1.** What is the equation used to forecast daily customer visits?
+
+**2.** How does day of week affect customer visits?
+
+**3.** How does time of year affect customer visits?
+
+**4.** What special factors affects customer visits and how can we use this information to improve our forecasts?
+
+**5.** What other data might you want to collect to improve forecast accuracy?
+
+
+## 1. Set up environment
+
+
+```{r Load packages}
+# Install pacman if needed
+if (!require("pacman")) install.packages("pacman")
+
+# load packages
+pacman::p_load(pacman,
+  tidyverse, openxlsx, forecast, modeltime, parsnip, rsample, timetk, xts, cowplot)
+```
+
+
+## Dinner
+
+```{r Check dinner data}
+dinner <- read.xlsx("datasets/Dinner.xlsx", skipEmptyRows = TRUE)
+
+str(dinner)
+```
+
+
+```{r Reformat Excel dates}
+dinner$Date <- as.Date(dinner$Date, origin = "1899-12-30")
+
+head(dinner$Date)
+```
+
+```{r Rename dinner columns}
+#Rename columns
+dinner <- dinner %>% 
+  rename(weekday = Day.week,
+         cust_count = Cust.count.dinner
+         )
+
+#Check column names
+names(dinner)
+```
+
+```{r Plot customer dinner counts}
+#From timetk package
+dinner %>%
+  plot_time_series(Date, cust_count, .interactive = TRUE)
+```
+
+
+
+```{r Plot customer counts across month and day of the week}
+b1 <- ggplot(dinner, aes(x=factor(Month), y = cust_count)) + geom_boxplot()
+
+b2 <- ggplot(dinner, aes(x=factor(weekday), y = cust_count)) + geom_boxplot()
+
+plot_grid(b1, b2, labels = "AUTO")
+```
+
+
+```{r Factor numeric variables}
+#Create list of variables that need transformation
+fac_vars <- c("Month", "weekday")
+
+#Factor Variables
+dinner[,fac_vars] <- lapply(dinner[,fac_vars], factor) 
+
+#check results
+str(dinner)
+```
+
+
+```{r Fit regression model}
+
+lm_01 <- # Identify outcome, state the rest; must specify dataset
+lm(cust_count ~ Month + weekday, data = dinner) 
+
+# Summarize regression model
+summary(lm_01)
+```
+
+```{r Compute accuracy statistics}
+# Use accuracy() to compute RMSE statistics
+accuracy(lm_01)
+
+```
+MAPE is at 15.49
+
+Now we can answer questions like "How many customers should we expect based on the day of week?"
+
+```{r Make predictions }
+explanatory_data <- tibble(dinner)
+
+#Put predictions inside a data frame
+prediction_data<- explanatory_data %>% 
+  mutate(forecast = predict(lm_01, explanatory_data))
+
+head(prediction_data)
+```
+
+actual minus forecast
+-a negative error means the actual result was below the forecast
+
+
+if forecasts are too high
+if forecasts are too low, company loses sales.
+
+absolute value of forecast errors allows us to calculate the distance between forecast and actual
+
+
+```{r Add errors to dataframe}
+prediction_data <- prediction_data %>% 
+  mutate(errors = cust_count - forecast)
+
+#Do the errors add up to zero?
+sum(prediction_data$errors)
+
+#Are the errors normally distributed?
+hist(prediction_data$errors)
+
+#Standard deviation of the errors - We need to know how accurate our forecasts should be.
+(one_sd_errors <- sd(prediction_data$errors))
+(two_sd_errors <- sd(prediction_data$errors) *2)
+```
+
+```{r Finding the outliers}
+#Add outlier column
+prediction_data <- prediction_data %>% 
+  mutate(outlier = case_when(abs(errors) > two_sd_errors ~ 1,
+                             TRUE ~ 0))
+
+prediction_data %>% 
+  summarize(total_errors = sum(outlier)/n() * 100)
+
+#view outlier rows only
+prediction_data %>% 
+  filter(outlier == 1) %>% 
+  select(Date, cust_count, forecast, errors, outlier) %>%  # subset columns
+  arrange(Date)
+```
+
+```{r Add outlier dummy variables to dataframe}
+
+dinner <- dinner %>% 
+  mutate(independ_day = case_when(Month == 7 & daymon == 4 ~ 1, TRUE ~ 0)) %>% 
+  mutate(valentines = case_when(Month == 2 & daymon %in% c(14) ~ 1, TRUE ~ 0)) %>% 
+  mutate(xmas_eve = case_when(Month == 12 & daymon == 24 ~ 1, TRUE ~ 0)) %>% 
+  mutate(new_years_eve = case_when(Month == 12 & daymon == 31 ~ 1, TRUE ~ 0))
+
+#CHECK RESULTS
+head(dinner)
+```
+
+# Prophet model
+
+
+```{r Prophet - model fit}
+dinner_new <- dinner %>% 
+  select(Date, cust_count)
+
+#We need to rename columns for the prophet model
+colnames(dinner_new)=c("ds", "y")
+
+model <- prophet(dinner_new, seasonality.mode='multiplicative')
+```
+
+```{r}
+
+future <- make_future_dataframe(model, periods = 30, freq = 'day')
+
+forecast <- predict(model, future)
+
+# If you want to see the forecast components, you can use the Prophet.plot_components method. By default you’ll see the trend, yearly seasonality, and weekly seasonality of the time series. If you include holidays, you’ll see those here, too.
+prophet_plot_components(model, forecast)
+```
+
+```{r}
+plot(model, forecast)
+```
+```{r}
+
+```
+
+
+### Questions to answer:
+
+**1.** What is the equation used to forecast daily customer visits?
+
+sales = 
+
+**2.** How does day of week affect customer visits?
+
+**3.** How does time of year affect customer visits?
+
+**4.** What special factors affects customer visits and how can we use this information to improve our forecasts?
+
+**5.** What other data might you want to collect to improve forecast accuracy?
