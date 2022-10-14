@@ -2,7 +2,7 @@
 
 Exercises for my medium articles.
 
-![](images/Screen%20Shot%202022-10-14%20at%209.51.00%20PM.png)
+![(images/Screen%20Shot%202022-10-14%20at%209.51.00%20PM.png)]
 
 Profile: <https://anitaowens.medium.com/>
 
