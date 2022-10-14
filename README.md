@@ -2,11 +2,11 @@
 
 Exercises for my medium articles.
 
-![(images/Screen%20Shot%202022-10-14%20at%209.51.00%20PM.png)]
+![](images/Medium%20snapshot.png)
 
 Profile: <https://anitaowens.medium.com/>
 
-# Published Articles Highlights
+# Highlights
 
 1.  [How to build a sales forecast in R](https://medium.com/geekculture/how-to-build-a-sales-forecast-in-r-dafabb03a076){.uri}
 2.  [How to use multiple linear regression to determine which marketing actions drives sales](https://medium.com/mlearning-ai/how-to-use-multiple-linear-regression-in-r-to-determine-which-marketing-actions-drives-sales-cf733eeae28e)
