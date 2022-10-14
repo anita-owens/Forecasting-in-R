@@ -2,7 +2,7 @@
 
 Exercises for my medium articles.
 
-![](../images/Medium%20snapshot.png)
+![Medium snapshot](https://user-images.githubusercontent.com/13710429/195933175-6d56fb69-eff3-4c2f-b150-57d59ac92579.png)
 
 Profile: <https://anitaowens.medium.com/>
 
