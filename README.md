@@ -8,7 +8,7 @@ Profile: <https://anitaowens.medium.com/>
 
 # Highlights
 
-1.  [How to build a sales forecast in R](https://medium.com/geekculture/how-to-build-a-sales-forecast-in-r-dafabb03a076){.uri}
+1.  [How to build a sales forecast in R](https://medium.com/geekculture/how-to-build-a-sales-forecast-in-r-dafabb03a076)
 2.  [How to use multiple linear regression to determine which marketing actions drives sales](https://medium.com/mlearning-ai/how-to-use-multiple-linear-regression-in-r-to-determine-which-marketing-actions-drives-sales-cf733eeae28e)
 3.  [How to forecast sales with advertising spend](https://medium.com/geekculture/how-to-forecast-sales-with-advertising-spend-in-r-36e6fc99760a)
 4.  [How to forecast product sales in the Tidyverse with Modeltime and Meta's Prophet Library](https://anitaowens.medium.com/how-to-forecast-product-sales-in-the-r-tidyverse-with-modeltime-and-prophet-cd509506940d)
